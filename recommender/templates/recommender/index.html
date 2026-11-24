@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if selected_movie %}Because you liked {{ selected_movie.title }}{% else %}CineMatch — Find your next watch{% endif %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+    <div class="page">
+
+        <header class="hero">
+            <div class="hero__inner">
+                <p class="eyebrow">Content-based filtering &middot; TF&#8209;IDF + cosine similarity</p>
+                <h1 class="hero__title">Find your next<br>favorite film</h1>
+                <p class="hero__subtitle">
+                    Pick something you already like. The engine compares genres and plot
+                    summaries across {{ total_movies }} films and hands back the closest matches.
+                </p>
+
+                <form class="search" method="get" action="{% url 'recommender:index' %}">
+                    <div class="search__field">
+                        <label for="movie-input" class="sr-only">Movie title</label>
+                        <input
+                            type="text"
+                            id="movie-input"
+                            name="movie"
+                            list="movie-list"
+                            placeholder="Search a movie, e.g. Inception"
+                            value="{{ selected_title }}"
+                            autocomplete="off"
+                            required
+                        >
+                        <datalist id="movie-list">
+                            {% for t in titles %}
+                            <option value="{{ t }}"></option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <button type="submit" class="btn btn--primary">Get recommendations</button>
+                </form>
+
+                {% if error %}
+                <p class="alert">{{ error }}</p>
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="sprocket-divider" aria-hidden="true"></div>
+
+        <main class="results">
+            {% if selected_movie %}
+
+                <section class="now-showing">
+                    <p class="section-label">Now showing</p>
+                    <div class="selected-card">
+                        <div class="selected-card__poster" aria-hidden="true">{{ selected_movie.title|slice:":1" }}</div>
+                        <div class="selected-card__body">
+                            <h2>{{ selected_movie.title }}{% if selected_movie.year %} <span class="year">({{ selected_movie.year }})</span>{% endif %}</h2>
+                            <div class="chips">
+                                {% for g in selected_movie.genres %}
+                                <span class="chip">{{ g }}</span>
+                                {% endfor %}
+                            </div>
+                            <p class="overview">{{ selected_movie.overview }}</p>
+                        </div>
+                        <div class="cache-badge {% if from_cache %}cache-badge--hit{% else %}cache-badge--miss{% endif %}">
+                            <span class="dot"></span>
+                            {% if from_cache %}served from Redis cache{% else %}computed &amp; cached just now{% endif %}
+                        </div>
+                    </div>
+                </section>
+
+                <section class="recommendations">
+                    <p class="section-label">Because you liked {{ selected_movie.title }}</p>
+
+                    {% if recommendations %}
+                    <div class="grid">
+                        {% for movie in recommendations %}
+                        <a class="card" href="?movie={{ movie.title|urlencode }}" style="--score: {{ movie.score }};">
+                            <span class="card__rank">{{ forloop.counter }}</span>
+                            <div class="match-ring">
+                                <span class="match-ring__value">{{ movie.score }}%</span>
+                            </div>
+                            <h3 class="card__title">{{ movie.title }}</h3>
+                            <p class="card__meta">{% if movie.year %}{{ movie.year }} &middot; {% endif %}{{ movie.genres|join:" / " }}</p>
+                            <p class="card__overview">{{ movie.overview }}</p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="empty">No close matches found in the catalogue for this title yet.</p>
+                    {% endif %}
+                </section>
+
+            {% else %}
+
+                <section class="empty-state">
+                    <p class="section-label">How it works</p>
+                    <div class="how-it-works">
+                        <div class="step">
+                            <span class="step__num">01</span>
+                            <h3>Type a title</h3>
+                            <p>Start typing in the search box above — every film in the catalogue is suggested as you go.</p>
+                        </div>
+                        <div class="step">
+                            <span class="step__num">02</span>
+                            <h3>Vectors get compared</h3>
+                            <p>Genres and plot summaries are turned into TF&#8209;IDF vectors, then scored with cosine similarity.</p>
+                        </div>
+                        <div class="step">
+                            <span class="step__num">03</span>
+                            <h3>Redis remembers</h3>
+                            <p>The result is cached, so asking for the same film again skips the recomputation entirely.</p>
+                        </div>
+                    </div>
+                </section>
+
+            {% endif %}
+        </main>
+
+        <footer class="footer">
+            <p>Built with Django, pandas, scikit-learn &amp; Redis &middot; {{ total_movies }} films indexed &middot; learning project</p>
+        </footer>
+
+    </div>
+
+</body>
+</html>
